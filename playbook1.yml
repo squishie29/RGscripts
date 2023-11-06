@@ -1,0 +1,90 @@
+---
+- hosts: localhost
+  tasks:
+    - name: Print message
+      debug:
+        msg: "Starting the deployment process. Contact us at soc@raiseguard.net if you have any questions!"
+
+    - name: Install GNUPG and apt-transport-https
+      become: yes  # This allows the task to run with elevated privileges (sudo)
+      apt:
+        name: gnupg, apt-transport-https
+        state: present
+    - name: Add Wazuh GPG key and set permissions
+      become: yes
+      shell: |
+        curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg
+    - name: Add Wazuh repository to sources.list
+      become: yes
+      shell: |
+        echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main" | tee -a /etc/apt/sources.list.d/wazuh.list
+    - name: Update APT cache
+      become: yes
+      apt:
+        update_cache: yes
+    - name: Install Wazuh Manager
+      become: yes
+      apt:
+        name: wazuh-manager
+        state: present
+    - name: Reload systemd daemon
+      become: yes
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable Wazuh Manager service
+      become: yes
+      systemd:
+        name: wazuh-manager
+        enabled: yes
+
+    - name: Start Wazuh Manager service
+      become: yes
+      systemd:
+        name: wazuh-manager
+        state: started
+    - name: Check the status of the Wazuh Manager service
+      become: yes
+      shell: systemctl status wazuh-manager
+      register: wazuh_manager_status
+
+    - name: Display Wazuh Manager service status
+      debug:
+        var: wazuh_manager_status.stdout_lines
+    - name: Install Graylog dependencies
+      become: yes
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - apt-transport-https
+        - openjdk-11-jre-headless
+        - uuid-runtime
+        - pwgen
+        - dirmngr
+        - gnupg
+        - wget
+    - name: Add MongoDB GPG key
+      become: yes
+      shell: |
+        wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add -
+
+    - name: Add MongoDB repository
+      become: yes
+      shell: |
+        echo "deb http://repo.mongodb.org/apt/debian buster/mongodb-org/4.4 main" | tee /etc/apt/sources.list.d/mongodb-org-4.4.list
+
+    - name: Update APT cache for MongoDB repository
+      become: yes
+      apt:
+        update_cache: yes
+    - name: Update APT cache for MongoDB repository
+      become: yes
+      apt:
+        update_cache: yes
+
+    - name: Install MongoDB
+      become: yes
+      apt:
+        name: mongodb-org
+        state: present
