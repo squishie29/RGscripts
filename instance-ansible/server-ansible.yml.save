@@ -95,7 +95,6 @@
     - name: Install Graylog repository package
       become: yes
       shell: dpkg -i graylog-4.3-repository_latest.deb
-      ignore_errors: true
 
     - name: Update APT cache
       become: yes
@@ -107,100 +106,12 @@
       apt:
         name: graylog-server, graylog-integrations-plugins
         state: present
-
     - name: Create Graylog certs directory
       become: yes
       file:
         path: /etc/graylog/server/certs
         state: directory
+- name: Copy cacerts file to Graylog certs directory
+  become: yes
+  command: cp -a /usr/lib/jvm/java-11-openjdk-amd64/lib/security/cacerts /etc/graylog/server/certs/cacerts
 
-    - name: Copy cacerts file to Graylog certs directory
-      become: yes
-      command: cp -a /usr/lib/jvm/java-11-openjdk-amd64/lib/security/cacerts /etc/graylog/server/certs/cacerts
-
-    - name: Check if the certificate file exists
-      become: yes
-      stat:
-        path: /etc/graylog/server/certs/root-ca.pem
-      register: certificate_status
-    
-    - name: Import certificate into Graylog keystore if the file exists
-      become: yes
-      command: keytool -importcert -keystore /etc/graylog/server/certs/cacerts -storepass changeit -alias root_ca -file /etc/graylog/server/certs/root-ca.pem
-      when: certificate_status.stat.exists
-
-    - name: Copy server.conf to /etc/graylog/server/
-      become: yes
-      copy:
-        src: "server.conf"  # Source file in the current directory
-        dest: "/etc/graylog/server/server.conf"  # Destination directory and file
-
-    - name: Start Graylog Server
-      become: yes
-      systemd:
-        name: graylog-server
-        state: started
-      
-    - name: Add MongoDB GPG key
-      become: yes
-      shell: wget -qO - https://www.mongodb.org/static/pgp/server-5.0.asc | apt-key add -
-
-    - name: Add MongoDB repository
-      become: yes
-      shell: echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/5.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-5.0.list
-
-    - name: Update and upgrade packages
-      become: yes
-      apt:
-        update_cache: yes
-        upgrade: dist
-
-    - name: Start MongoDB service
-      become: yes
-      systemd:
-        name: mongod
-        state: started
-
-    - name: Check the status of MongoDB service
-      become: yes
-      shell: systemctl status mongod
-
-    - name: Download Graylog repository package
-      become: yes
-      shell: wget https://packages.graylog2.org/repo/packages/graylog-5.0-repository_latest.deb
-
-    - name: Stop Graylog service for update
-      become: yes
-      systemd:
-        name: graylog-server
-        state: stopped
-
-    - name: Update Graylog repository package
-      become: yes
-      shell: dpkg -i graylog-5.0-repository_latest.deb
-
-    - name: Update APT
-      become: yes
-      apt:
-        update_cache: yes
-
-    - name: Update graylog server
-      become: yes
-      apt:
-        name: graylog-server
-        state: present
-
-    - name: Reload systemd daemon
-      become: yes
-      systemd:
-        daemon_reload: yes
-
-    - name: Start Graylog Server
-      become: yes
-      systemd:
-        name: graylog-server
-        state: started
-
-    - name: Check the status of Graylog Server
-      become: yes
-      shell: systemctl status graylog-server
